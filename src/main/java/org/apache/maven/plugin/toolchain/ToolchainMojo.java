@@ -44,7 +44,7 @@ import java.util.Map;
  * @author mkleint
  */
 @Mojo( name = "toolchain", defaultPhase = LifecyclePhase.VALIDATE,
-       configurator = "toolchains-requirement-configurator" )
+       configurator = "toolchains-requirement-configurator", threadSafe = true )
 public class ToolchainMojo
     extends AbstractMojo
 {
@@ -71,6 +71,8 @@ public class ToolchainMojo
     @Parameter( required = true )
     private ToolchainsRequirement toolchains;
 
+    private static final Object LOCK = new Object();
+
     public void execute()
         throws MojoExecutionException, MojoFailureException
     {
@@ -83,15 +85,18 @@ public class ToolchainMojo
 
         List<String> nonMatchedTypes = new ArrayList<String>();
 
-        for ( Map.Entry<String, Map<String, String>> entry : toolchains.getToolchains().entrySet() )
-        {
-            String type = entry.getKey();
-
-            if ( !selectToolchain( type, entry.getValue() ) )
+	synchronized ( LOCK )
+	{
+            for ( Map.Entry<String, Map<String, String>> entry : toolchains.getToolchains().entrySet() )
             {
-                nonMatchedTypes.add( type );
+                String type = entry.getKey();
+
+                if ( !selectToolchain( type, entry.getValue() ) )
+                {
+                    nonMatchedTypes.add( type );
+                }
             }
-        }
+	}
 
         if ( !nonMatchedTypes.isEmpty() )
         {
